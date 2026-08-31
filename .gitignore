@@ -1,13 +1,24 @@
 # Environment variables
 .env
+backend/.env
+backend/.env.*
 
 # Python
 __pycache__/
 *.py[cod]
-
-# Virtual environment
 .venv/
 venv/
+backend/.venv/
+backend/venv/
+backend/__pycache__/
+backend/**/*.pyc
+
+# Backend data
+backend/documents/*
+!backend/documents/.gitkeep
+
+backend/vectorstore/*
+!backend/vectorstore/.gitkeep
 
 # FAISS vector database
 vectorstore/
@@ -15,13 +26,46 @@ vectorstore/
 # Temporary files
 *.tmp
 *.temp
+*.pdf
+
+# PDF uploads in repo root
+documents/*.pdf
 
 # IDE
 .vscode/
 .idea/
+*.iml
+frontend/.idea/
+frontend/*.iml
+frontend/android/*.iml
 
 # OS
 .DS_Store
 Thumbs.db
 
-documents/*.pdf
+# Flutter
+frontend/.dart_tool/
+frontend/build/
+frontend/.flutter-plugins
+frontend/.flutter-plugins-dependencies
+frontend/.packages
+
+# Android generated/local
+frontend/android/.gradle/
+frontend/android/local.properties
+
+# iOS generated
+frontend/ios/Flutter/Generated.xcconfig
+frontend/ios/Flutter/ephemeral/
+frontend/ios/Flutter/flutter_export_environment.sh
+frontend/ios/Runner/GeneratedPluginRegistrant.h
+frontend/ios/Runner/GeneratedPluginRegistrant.m
+
+# Linux generated
+frontend/linux/flutter/ephemeral/
+
+# macOS generated
+frontend/macos/Flutter/ephemeral/
+
+# Windows generated
+frontend/windows/flutter/ephemeral/
