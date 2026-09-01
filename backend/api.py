@@ -15,6 +15,13 @@ from rag_pipeline import (
 
 
 # ============================================================
+# CONFIGURATION
+# ============================================================
+
+MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB
+
+
+# ============================================================
 # FASTAPI APP
 # ============================================================
 
@@ -24,11 +31,16 @@ app = FastAPI(
     version="1.0.0"
 )
 
+
+# ============================================================
+# CORS
+# ============================================================
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
     allow_credentials=False,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )
 
@@ -37,6 +49,10 @@ app.add_middleware(
 # GLOBAL VECTOR STORE
 # ============================================================
 
+# IMPORTANT:
+# Keep this None when the application starts.
+# The embedding model and FAISS store are loaded only
+# when a document is uploaded.
 vectorstore = None
 
 
@@ -45,7 +61,6 @@ vectorstore = None
 # ============================================================
 
 class QuestionRequest(BaseModel):
-
     question: str
 
 
@@ -63,6 +78,18 @@ def home():
 
 
 # ============================================================
+# HEALTH CHECK
+# ============================================================
+
+@app.get("/health")
+def health():
+
+    return {
+        "status": "healthy"
+    }
+
+
+# ============================================================
 # UPLOAD PDF
 # ============================================================
 
@@ -74,7 +101,7 @@ async def upload_pdf(
     global vectorstore
 
     # --------------------------------------------------------
-    # Validate file
+    # Validate filename
     # --------------------------------------------------------
 
     if not file.filename:
@@ -84,7 +111,9 @@ async def upload_pdf(
             detail="No file selected."
         )
 
-    if not file.filename.lower().endswith(".pdf"):
+    filename = os.path.basename(file.filename)
+
+    if not filename.lower().endswith(".pdf"):
 
         raise HTTPException(
             status_code=400,
@@ -98,13 +127,13 @@ async def upload_pdf(
         print("\n" + "=" * 60)
 
         print(
-            f"Uploading PDF: {file.filename}"
+            f"Uploading PDF: {filename}"
         )
 
         print("=" * 60)
 
         # ----------------------------------------------------
-        # Save uploaded PDF temporarily
+        # Save uploaded PDF
         # ----------------------------------------------------
 
         with tempfile.NamedTemporaryFile(
@@ -114,13 +143,36 @@ async def upload_pdf(
 
             temp_path = temp_file.name
 
-            shutil.copyfileobj(
-                file.file,
-                temp_file
-            )
+            total_size = 0
+
+            while True:
+
+                chunk = await file.read(1024 * 1024)
+
+                if not chunk:
+                    break
+
+                total_size += len(chunk)
+
+                # ------------------------------------------------
+                # File size protection
+                # ------------------------------------------------
+
+                if total_size > MAX_FILE_SIZE:
+
+                    raise HTTPException(
+                        status_code=413,
+                        detail="PDF is too large. Maximum size is 10 MB."
+                    )
+
+                temp_file.write(chunk)
 
         print(
             f"Temporary file created: {temp_path}"
+        )
+
+        print(
+            f"File size: {total_size / (1024 * 1024):.2f} MB"
         )
 
         # ----------------------------------------------------
@@ -137,6 +189,10 @@ async def upload_pdf(
         # FAISS
         # ----------------------------------------------------
 
+        print(
+            "\nProcessing document..."
+        )
+
         vectorstore = process_pdf(
             temp_path
         )
@@ -145,31 +201,37 @@ async def upload_pdf(
             "PDF processed successfully."
         )
 
-        print(
-            "=" * 60
-        )
+        print("=" * 60)
 
         return {
             "success": True,
             "message": "PDF processed successfully",
-            "filename": file.filename
+            "filename": filename
         }
+
+    except HTTPException:
+        raise
 
     except Exception as e:
 
-        print("\nERROR DURING PDF PROCESSING")
+        print(
+            "\nERROR DURING PDF PROCESSING"
+        )
 
         traceback.print_exc()
 
         raise HTTPException(
             status_code=500,
-            detail=f"{type(e).__name__}: {str(e)}"
+            detail={
+                "error": type(e).__name__,
+                "message": str(e)
+            }
         )
 
     finally:
 
         # ----------------------------------------------------
-        # Delete temporary file
+        # Delete temporary PDF
         # ----------------------------------------------------
 
         if (
@@ -178,13 +240,19 @@ async def upload_pdf(
             os.path.exists(temp_path)
         ):
 
-            os.remove(
-                temp_path
-            )
+            try:
 
-            print(
-                "Temporary file deleted."
-            )
+                os.remove(
+                    temp_path
+                )
+
+                print(
+                    "Temporary file deleted."
+                )
+
+            except Exception:
+
+                pass
 
 
 # ============================================================
@@ -222,6 +290,14 @@ async def ask_question(
             detail="Question cannot be empty."
         )
 
+    # Optional protection against extremely large prompts
+    if len(question) > 2000:
+
+        raise HTTPException(
+            status_code=400,
+            detail="Question is too long. Maximum length is 2000 characters."
+        )
+
     try:
 
         print("\n" + "=" * 60)
@@ -233,7 +309,7 @@ async def ask_question(
         print("=" * 60)
 
         # ----------------------------------------------------
-        # STEP 1: RETRIEVE RELEVANT CHUNKS
+        # STEP 1: RETRIEVE
         # ----------------------------------------------------
 
         print(
@@ -241,9 +317,7 @@ async def ask_question(
         )
 
         documents = retrieve_documents(
-
             vectorstore,
-
             question
         )
 
@@ -260,9 +334,7 @@ async def ask_question(
         )
 
         answer = generate_answer(
-
             question,
-
             documents
         )
 
@@ -333,11 +405,6 @@ async def ask_question(
 
     except Exception as e:
 
-        # ----------------------------------------------------
-        # IMPORTANT:
-        # Print complete traceback to FastAPI terminal
-        # ----------------------------------------------------
-
         print("\n" + "=" * 60)
 
         print(
@@ -358,4 +425,5 @@ async def ask_question(
                 "error": type(e).__name__,
                 "message": str(e)
             }
+
         )
