@@ -1,77 +1,144 @@
 # 🤖 AI Knowledge Copilot
 
-A full-stack **Retrieval-Augmented Generation (RAG)** application that lets users upload PDF documents and interact with them through a modern conversational AI interface.
+A modern **AI-powered document question-answering application** that allows users to upload PDF documents and interact with them through a conversational chat interface.
 
-The system processes the uploaded document locally, creates vector embeddings, retrieves the most relevant sections, and uses **Groq-hosted LLMs** to generate answers grounded in the document.
+The project combines a **Flutter Android frontend**, **FastAPI backend**, lightweight **TF-IDF document retrieval**, **FAISS-style vector retrieval**, and **Groq LLM inference** to provide answers based on uploaded documents.
 
 ---
 
 ## ✨ Features
 
-* 📄 **PDF Upload** — Upload documents directly from the Flutter application
-* 🧠 **RAG Pipeline** — Retrieve relevant document context before generating answers
-* 🔎 **Semantic Search** — Find relevant content using vector similarity
-* 💾 **FAISS Vector Store** — Store and search document embeddings locally
-* 🤗 **Local Embeddings** — Uses `all-MiniLM-L6-v2` through Hugging Face
-* ⚡ **Groq LLM** — Fast AI-powered answer generation
-* 💬 **Chat Interface** — Conversational interface for document Q&A
-* 🌙 **Dark / Light Mode** — Theme switching
-* ✨ **Animations & Transitions** — Modern interactive UI
-* 📱 **Responsive Flutter UI** — Designed for different screen sizes
-* 📚 **Source Retrieval** — Displays the document chunks used to answer questions
-* 🔐 **Environment-based API Key** — API credentials are stored outside the source code
+* 📄 **PDF Upload**
+
+  * Upload PDF documents directly from the mobile app.
+  * Automatic text extraction and document chunking.
+
+* 💬 **Conversational AI**
+
+  * Ask questions about uploaded documents.
+  * Chat-style question and answer interface.
+  * Press **Enter** to send questions.
+
+* 🧠 **RAG-based Question Answering**
+
+  * Relevant document chunks are retrieved before generating an answer.
+  * Answers are grounded in the uploaded document context.
+
+* 🔎 **Lightweight TF-IDF Retrieval**
+
+  * Uses TF-IDF for document similarity.
+  * Avoids heavyweight local embedding models.
+  * Suitable for low-memory cloud deployment.
+
+* ⚡ **Groq-powered AI**
+
+  * Uses Groq for fast response generation.
+
+* 🎨 **Modern Flutter UI**
+
+  * Responsive layout.
+  * Light and dark themes.
+  * Animated chat interactions.
+  * Upload and processing animations.
+  * AI "thinking" indicator.
+  * Smooth message transitions.
+
+* 📱 **Android Standalone App**
+
+  * Can be compiled into a release APK.
+  * Communicates directly with the deployed Render backend.
+
+* ☁️ **Cloud Backend**
+
+  * FastAPI backend deployed on Render.
+  * HTTPS communication between the Android app and backend.
+
+* 🌐 **CORS Support**
+
+  * Configured for frontend communication.
 
 ---
 
-## 🏗️ Architecture
+# 🏗️ Architecture
 
 ```text
                     ┌──────────────────────┐
-                    │   Flutter Frontend   │
-                    │                      │
-                    │  PDF Upload          │
-                    │  Chat Interface      │
-                    │  Theme Switching     │
-                    │  Animations          │
+                    │   Flutter Android    │
+                    │      Frontend        │
                     └──────────┬───────────┘
                                │
-                               │ HTTP
+                               │ HTTPS
                                ▼
                     ┌──────────────────────┐
-                    │    FastAPI Backend   │
-                    │                      │
-                    │  /upload             │
-                    │  /ask                │
+                    │    Render Cloud      │
+                    │     FastAPI API      │
                     └──────────┬───────────┘
                                │
-                               ▼
-                  ┌─────────────────────────┐
-                  │      RAG Pipeline       │
-                  │                         │
-                  │  PDF → Text Extraction  │
-                  │       ↓                 │
-                  │  Chunking               │
-                  │       ↓                 │
-                  │  Embeddings             │
-                  │       ↓                 │
-                  │  FAISS                  │
-                  │       ↓                 │
-                  │  Similarity Retrieval   │
-                  └──────────┬──────────────┘
-                             │
-                             ▼
-                    ┌──────────────────────┐
-                    │       Groq LLM       │
-                    │                      │
-                    │  Context + Question  │
-                    │          ↓           │
-                    │        Answer        │
-                    └──────────────────────┘
+                     ┌─────────┴─────────┐
+                     │                   │
+                     ▼                   ▼
+              ┌─────────────┐     ┌─────────────┐
+              │ PDF Loader  │     │    Groq     │
+              │  & Parser   │     │     LLM     │
+              └──────┬──────┘     └──────▲──────┘
+                     │                   │
+                     ▼                   │
+              ┌─────────────┐            │
+              │   Chunking  │            │
+              └──────┬──────┘            │
+                     │                   │
+                     ▼                   │
+              ┌─────────────┐            │
+              │ TF-IDF      │            │
+              │ Retrieval   │────────────┘
+              └─────────────┘
 ```
 
 ---
 
-## 📂 Project Structure
+# 🔄 Application Flow
+
+### 1. Upload
+
+```text
+User selects PDF
+       ↓
+Flutter sends multipart request
+       ↓
+FastAPI /upload
+       ↓
+PDF text extraction
+       ↓
+Document chunking
+       ↓
+TF-IDF vectorization
+       ↓
+Vector store created
+```
+
+### 2. Ask
+
+```text
+User enters question
+       ↓
+Flutter sends POST /ask
+       ↓
+FastAPI receives question
+       ↓
+TF-IDF similarity search
+       ↓
+Relevant chunks retrieved
+       ↓
+Context + question sent to Groq
+       ↓
+AI-generated answer
+       ↓
+Flutter displays response
+```
+
+---
+
+# 📂 Project Structure
 
 ```text
 ai-knowledge-copilot/
@@ -80,8 +147,7 @@ ai-knowledge-copilot/
 │   ├── api.py
 │   ├── rag_pipeline.py
 │   ├── requirements.txt
-│   ├── documents/
-│   └── vectorstore/
+│   └── .env
 │
 ├── frontend/
 │   ├── lib/
@@ -92,10 +158,12 @@ ai-knowledge-copilot/
 │   │
 │   ├── android/
 │   ├── ios/
-│   ├── web/
+│   ├── linux/
+│   ├── macos/
 │   ├── windows/
-│   ├── test/
-│   └── pubspec.yaml
+│   ├── web/
+│   ├── pubspec.yaml
+│   └── ...
 │
 ├── .gitignore
 └── README.md
@@ -103,102 +171,25 @@ ai-knowledge-copilot/
 
 ---
 
-# 🧠 How RAG Works
+# 🛠️ Technology Stack
 
-The application follows a Retrieval-Augmented Generation workflow.
-
-### 1. Upload
-
-The user uploads a PDF through the Flutter frontend.
-
-### 2. Text Extraction
-
-The backend extracts text from the PDF using `PyPDFLoader`.
-
-### 3. Chunking
-
-The extracted text is divided into smaller overlapping chunks using `RecursiveCharacterTextSplitter`.
-
-```text
-PDF
- ↓
-Extracted Text
- ↓
-1000-character chunks
- ↓
-200-character overlap
-```
-
-### 4. Embeddings
-
-Each chunk is converted into a vector representation using:
-
-```text
-sentence-transformers/all-MiniLM-L6-v2
-```
-
-### 5. Vector Storage
-
-The embeddings are stored in a local **FAISS** vector database.
-
-### 6. Retrieval
-
-When the user asks a question, the system performs similarity search and retrieves the most relevant chunks.
-
-The current configuration retrieves:
-
-```text
-TOP_K = 4
-```
-
-### 7. Generation
-
-The retrieved context and user's question are passed to the Groq LLM.
-
-The model is instructed to answer using the provided document context rather than inventing information.
+| Component        | Technology                     |
+| ---------------- | ------------------------------ |
+| Frontend         | Flutter / Dart                 |
+| Backend          | Python / FastAPI               |
+| PDF Processing   | PyPDF                          |
+| Text Chunking    | LangChain                      |
+| Retrieval        | TF-IDF                         |
+| Vector Search    | Lightweight local vector store |
+| LLM              | Groq                           |
+| Cloud Deployment | Render                         |
+| Mobile Platform  | Android                        |
+| API Format       | REST                           |
+| Communication    | HTTPS                          |
 
 ---
 
-# 🛠️ Tech Stack
-
-## Backend
-
-| Technology            | Purpose                  |
-| --------------------- | ------------------------ |
-| Python                | Backend & RAG pipeline   |
-| FastAPI               | REST API                 |
-| LangChain             | RAG orchestration        |
-| PyPDF                 | PDF processing           |
-| Hugging Face          | Local embeddings         |
-| Sentence Transformers | Embedding model          |
-| FAISS                 | Vector similarity search |
-| Groq                  | LLM inference            |
-| Uvicorn               | ASGI server              |
-
-## Frontend
-
-| Technology | Purpose               |
-| ---------- | --------------------- |
-| Flutter    | Cross-platform UI     |
-| Dart       | Application language  |
-| HTTP       | Backend communication |
-
----
-
-# 🚀 Getting Started
-
-## Prerequisites
-
-Install:
-
-* Python 3.10+
-* Flutter SDK
-* Git
-* A Groq API key
-
----
-
-# ⚙️ Backend Setup
+# 🚀 Running the Backend Locally
 
 Navigate to the backend:
 
@@ -215,7 +206,7 @@ python -m venv .venv
 Activate it on Windows:
 
 ```powershell
-.venv\Scripts\Activate.ps1
+.\.venv\Scripts\Activate.ps1
 ```
 
 Install dependencies:
@@ -223,10 +214,6 @@ Install dependencies:
 ```bash
 pip install -r requirements.txt
 ```
-
----
-
-## 🔑 Environment Variables
 
 Create:
 
@@ -237,42 +224,38 @@ backend/.env
 Add:
 
 ```env
-GROQ_API_KEY=your_groq_api_key_here
+GROQ_API_KEY=your_groq_api_key
 ```
 
-**Never commit `.env` to GitHub.**
-
-The API key is intentionally excluded through `.gitignore`.
-
----
-
-# ▶️ Run the Backend
-
-From the `backend` directory:
+Start FastAPI:
 
 ```bash
 uvicorn api:app --reload
 ```
 
-The API will run at:
+The API will be available at:
 
 ```text
 http://127.0.0.1:8000
 ```
 
-You can verify that it is running by opening the API root endpoint.
+Swagger documentation:
+
+```text
+http://127.0.0.1:8000/docs
+```
 
 ---
 
-# 📱 Frontend Setup
+# 📱 Running the Flutter Frontend
 
-Open another terminal:
+Navigate to:
 
 ```bash
 cd frontend
 ```
 
-Install Flutter dependencies:
+Install dependencies:
 
 ```bash
 flutter pub get
@@ -284,13 +267,7 @@ Check available devices:
 flutter devices
 ```
 
-Run on Chrome:
-
-```bash
-flutter run -d chrome
-```
-
-Or run on another available Flutter device:
+Run the application:
 
 ```bash
 flutter run
@@ -298,13 +275,123 @@ flutter run
 
 ---
 
-# 🔗 API Endpoints
+# 🔗 Backend Configuration
 
-## `GET /`
+The Flutter application should point to the deployed Render backend:
 
-Checks whether the backend is running.
+```dart
+const String baseUrl =
+    'https://YOUR-RENDER-SERVICE.onrender.com';
+```
 
-### Response
+For local development, you can use:
+
+```dart
+const String baseUrl =
+    'http://127.0.0.1:8000';
+```
+
+For the Android standalone APK, use the **Render HTTPS URL**.
+
+---
+
+# 📱 Build Standalone APK
+
+From the `frontend` directory:
+
+```bash
+flutter clean
+```
+
+```bash
+flutter pub get
+```
+
+Build:
+
+```bash
+flutter build apk --release
+```
+
+The generated APK will be located at:
+
+```text
+build/app/outputs/flutter-apk/app-release.apk
+```
+
+For architecture-specific APKs:
+
+```bash
+flutter build apk --release --split-per-abi
+```
+
+---
+
+# ☁️ Render Deployment
+
+The backend is designed to run as a Render Web Service.
+
+### Root Directory
+
+```text
+backend
+```
+
+### Build Command
+
+```bash
+pip install -r requirements.txt
+```
+
+### Start Command
+
+```bash
+uvicorn api:app --host 0.0.0.0 --port $PORT
+```
+
+### Environment Variable
+
+```text
+GROQ_API_KEY
+```
+
+The API can then be accessed through the Render HTTPS URL.
+
+---
+
+# 🔐 Security
+
+API keys should **never be stored in the Flutter application or committed to GitHub**.
+
+Use environment variables:
+
+```env
+GROQ_API_KEY=your_key
+```
+
+Ensure `.env` is included in `.gitignore`.
+
+Example:
+
+```gitignore
+.env
+.venv/
+__pycache__/
+build/
+.dart_tool/
+```
+
+---
+
+# 🧪 API Endpoints
+
+## Health Check
+
+```http
+GET /
+```
+
+Response:
 
 ```json
 {
@@ -315,151 +402,105 @@ Checks whether the backend is running.
 
 ---
 
-## `POST /upload`
+## Upload PDF
 
-Uploads and processes a PDF.
+```http
+POST /upload
+```
 
-### Processing flow
+Form field:
 
 ```text
-PDF
- ↓
-Text Extraction
- ↓
-Chunking
- ↓
-Embedding Generation
- ↓
-FAISS Vector Store
+file
 ```
 
----
-
-## `POST /ask`
-
-Accepts a question about the uploaded document.
-
-### Request
-
-```json
-{
-  "question": "What is the main purpose of this document?"
-}
-```
-
-### Response
+Example response:
 
 ```json
 {
   "success": true,
-  "question": "What is the main purpose of this document?",
-  "answer": "...",
-  "sources": []
+  "message": "PDF processed successfully",
+  "filename": "document.pdf"
 }
 ```
 
 ---
 
-# 🔐 Security
+## Ask Question
 
-The project follows several basic security practices:
-
-* API keys are stored in environment variables.
-* `.env` files are excluded from Git.
-* Uploaded PDFs are excluded from Git.
-* FAISS vector-store files are excluded from Git.
-* Python virtual environments are excluded from Git.
-* Flutter build/generated files are excluded from Git.
-
-For production deployment, additional protections should be added, including:
-
-* Authentication
-* File-size limits
-* Strong PDF/content validation
-* Restricted CORS origins
-* Rate limiting
-* Secure deployment configuration
-
----
-
-# 🧪 Development
-
-Run backend:
-
-```bash
-cd backend
-uvicorn api:app --reload
+```http
+POST /ask
 ```
 
-Run frontend:
+Request:
 
-```bash
-cd frontend
-flutter run -d chrome
+```json
+{
+  "question": "What is this document about?"
+}
 ```
 
-Run Flutter analysis:
+Response:
 
-```bash
-flutter analyze
-```
-
-Run Flutter tests:
-
-```bash
-flutter test
+```json
+{
+  "success": true,
+  "question": "What is this document about?",
+  "answer": "..."
+}
 ```
 
 ---
 
-# 📌 Current Model Configuration
+# 🎯 Current Version
 
-### Embedding Model
+**AI Knowledge Copilot — v1.0.0**
 
-```text
-sentence-transformers/all-MiniLM-L6-v2
-```
+Current version includes:
 
-Embeddings are generated locally, so the application does not require a paid embedding API.
-
-### LLM
-
-```text
-openai/gpt-oss-120b
-```
-
-served through Groq.
+* Flutter Android frontend
+* Responsive modern chat UI
+* PDF upload
+* Document processing
+* TF-IDF retrieval
+* Groq-powered answers
+* Render cloud backend
+* Standalone Android APK support
+* Light/dark theme
+* Animated interactions
 
 ---
 
-# 🎯 Project Goals
+# ⚠️ Current Limitations
 
-AI Knowledge Copilot was built to demonstrate practical implementation of:
+This version is primarily intended as a **portfolio/demo application**.
 
-* Retrieval-Augmented Generation
-* Vector databases
-* Semantic search
-* Local embedding models
-* LLM integration
-* REST API development
-* Flutter frontend development
-* Full-stack AI application architecture
+The current backend maintains the processed document's retrieval data in memory. Therefore:
+
+* Restarting the Render service clears the current document.
+* The current vector store isn't persistent.
+* The architecture is not yet designed for multiple simultaneous users.
+* TF-IDF retrieval is lexical rather than transformer-based semantic retrieval.
+
+These can be addressed in a future production version with persistent storage, user/session isolation, and a dedicated vector database.
 
 ---
 
 # 🔮 Future Improvements
 
-* [ ] Multi-document support
-* [ ] Persistent user sessions
-* [ ] Conversation history
-* [ ] Streaming LLM responses
-* [ ] Document management
+* [ ] Persistent document storage
+* [ ] Multi-user support
 * [ ] User authentication
-* [ ] Cloud vector database
-* [ ] Production deployment
-* [ ] Better document metadata and citations
-* [ ] Support for additional document formats
-* [ ] Voice-based questions
+* [ ] Conversation history
+* [ ] Multiple PDF support
+* [ ] Persistent vector database
+* [ ] Semantic embeddings
+* [ ] Streaming AI responses
+* [ ] Document management
+* [ ] Source highlighting
+* [ ] Page-level citations
+* [ ] Production monitoring
+* [ ] Google Play Store deployment
 
 ---
 
@@ -467,14 +508,14 @@ AI Knowledge Copilot was built to demonstrate practical implementation of:
 
 **Vishwanth CR**
 
-GitHub: [VishwanthCR](https://github.com/VishwanthCR?utm_source=chatgpt.com)
+Computer Science Engineering Student
 
-LinkedIn: [Vishwanth CR](https://www.linkedin.com/in/vishwanth-cr?utm_source=chatgpt.com)
+GitHub: [VishwanthCR](https://github.com/VishwanthCR)
+
+LinkedIn: [Vishwanth CR](https://www.linkedin.com/in/vishwanth-cr)
 
 ---
 
-## ⭐ If you find this project useful
+## ⭐ Project
 
-Give the repository a ⭐ on GitHub and feel free to explore the implementation.
-
-[AI Knowledge Copilot on GitHub](https://github.com/VishwanthCR/ai-knowledge-copilot?utm_source=chatgpt.com)
+If you find this project useful, consider giving it a ⭐ on GitHub.
