@@ -1,13 +1,12 @@
 import os
-from typing import List
+from typing import List, Tuple
 
+import numpy as np
 from dotenv import load_dotenv
+from sklearn.feature_extraction.text import TfidfVectorizer
 
 from langchain_community.document_loaders import PyPDFLoader
-from langchain_community.vectorstores import FAISS
 from langchain_core.documents import Document
-from langchain_core.prompts import ChatPromptTemplate
-from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from langchain_groq import ChatGroq
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
@@ -19,17 +18,10 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 load_dotenv()
 
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
-
 
 if not GROQ_API_KEY:
     raise RuntimeError(
         "GROQ_API_KEY is not configured."
-    )
-
-if not GOOGLE_API_KEY:
-    raise RuntimeError(
-        "GOOGLE_API_KEY is not configured."
     )
 
 
@@ -43,31 +35,91 @@ TOP_K = 4
 
 
 # ============================================================
-# EMBEDDINGS
+# LIGHTWEIGHT VECTOR STORE
 # ============================================================
 
-def get_embeddings() -> GoogleGenerativeAIEmbeddings:
+class TFIDFVectorStore:
     """
-    Create the Google Gemini embedding model.
+    Lightweight local vector store using TF-IDF.
 
-    GOOGLE_API_KEY is automatically read from
-    the environment by langchain-google-genai.
+    This replaces the Hugging Face / Gemini embedding
+    dependency and is suitable for low-memory deployments.
     """
 
-    return GoogleGenerativeAIEmbeddings(
-        model="models/gemini-embedding-001",
-        task_type="RETRIEVAL_DOCUMENT",
-    )
+    def __init__(
+        self,
+        documents: List[Document],
+    ) -> None:
+
+        self.documents = documents
+
+        self.vectorizer = TfidfVectorizer(
+            lowercase=True,
+            stop_words="english",
+            max_features=20000,
+            ngram_range=(1, 2),
+        )
+
+        texts = [
+            document.page_content
+            for document in documents
+        ]
+
+        self.vectors = self.vectorizer.fit_transform(
+            texts
+        )
+
+    def similarity_search(
+        self,
+        query: str,
+        k: int = TOP_K,
+    ) -> List[Document]:
+        """
+        Retrieve the most relevant document chunks.
+        """
+
+        if not self.documents:
+            return []
+
+        query_vector = self.vectorizer.transform(
+            [query]
+        )
+
+        # TF-IDF vectors are L2-normalized by default,
+        # therefore dot product gives cosine similarity.
+        scores = (
+            self.vectors @ query_vector.T
+        ).toarray().flatten()
+
+        # Don't request more documents than available.
+        k = min(
+            k,
+            len(self.documents)
+        )
+
+        # Highest scores first.
+        top_indices = np.argsort(
+            scores
+        )[::-1][:k]
+
+        return [
+            self.documents[index]
+            for index in top_indices
+        ]
 
 
 # ============================================================
 # LOAD PDF
 # ============================================================
 
-def load_pdf(pdf_path: str) -> List[Document]:
-    """Load and extract text from a PDF."""
+def load_pdf(
+    pdf_path: str,
+) -> List[Document]:
+    """Load a PDF and extract its text."""
 
-    loader = PyPDFLoader(pdf_path)
+    loader = PyPDFLoader(
+        pdf_path
+    )
 
     documents = loader.load()
 
@@ -81,7 +133,7 @@ def load_pdf(pdf_path: str) -> List[Document]:
 def split_documents(
     documents: List[Document],
 ) -> List[Document]:
-    """Split documents into overlapping chunks."""
+    """Split PDF content into smaller chunks."""
 
     splitter = RecursiveCharacterTextSplitter(
         chunk_size=CHUNK_SIZE,
@@ -101,18 +153,20 @@ def split_documents(
 
 def create_vectorstore(
     chunks: List[Document],
-) -> FAISS:
-    """Create a FAISS vector store from document chunks."""
+) -> TFIDFVectorStore:
+    """Create a lightweight TF-IDF vector store."""
 
     print(
-        f"Creating embeddings for {len(chunks)} chunks..."
+        f"Creating TF-IDF vectors for "
+        f"{len(chunks)} chunks..."
     )
 
-    embeddings = get_embeddings()
+    vectorstore = TFIDFVectorStore(
+        chunks
+    )
 
-    vectorstore = FAISS.from_documents(
-        chunks,
-        embeddings,
+    print(
+        "TF-IDF vector store created successfully."
     )
 
     return vectorstore
@@ -122,7 +176,9 @@ def create_vectorstore(
 # PROCESS PDF
 # ============================================================
 
-def process_pdf(pdf_path: str) -> FAISS:
+def process_pdf(
+    pdf_path: str,
+) -> TFIDFVectorStore:
     """
     Complete PDF processing pipeline.
 
@@ -132,9 +188,9 @@ def process_pdf(pdf_path: str) -> FAISS:
       ↓
     Chunking
       ↓
-    Google Gemini embeddings
+    TF-IDF vectors
       ↓
-    FAISS vector store
+    Lightweight vector store
     """
 
     print(
@@ -169,10 +225,6 @@ def process_pdf(pdf_path: str) -> FAISS:
         chunks
     )
 
-    print(
-        "Vector store created successfully."
-    )
-
     return vectorstore
 
 
@@ -181,10 +233,10 @@ def process_pdf(pdf_path: str) -> FAISS:
 # ============================================================
 
 def retrieve_documents(
-    vectorstore: FAISS,
+    vectorstore: TFIDFVectorStore,
     question: str,
 ) -> List[Document]:
-    """Retrieve the most relevant document chunks."""
+    """Retrieve the most relevant chunks."""
 
     documents = vectorstore.similarity_search(
         question,
@@ -212,11 +264,7 @@ def get_llm() -> ChatGroq:
 # PROMPT
 # ============================================================
 
-PROMPT = ChatPromptTemplate.from_messages(
-    [
-        (
-            "system",
-            """
+PROMPT = """
 You are AI Knowledge Copilot.
 
 Answer the user's question using ONLY
@@ -233,14 +281,11 @@ Be concise, accurate, and helpful.
 DOCUMENT CONTEXT:
 
 {context}
-""",
-        ),
-        (
-            "human",
-            "{question}",
-        ),
-    ]
-)
+
+USER QUESTION:
+
+{question}
+"""
 
 
 # ============================================================
@@ -251,7 +296,7 @@ def generate_answer(
     question: str,
     documents: List[Document],
 ) -> str:
-    """Generate an answer from retrieved document context."""
+    """Generate an answer using Groq."""
 
     # --------------------------------------------------------
     # Build context
@@ -260,6 +305,7 @@ def generate_answer(
     context_parts: List[str] = []
 
     for document in documents:
+
         context_parts.append(
             document.page_content
         )
@@ -269,14 +315,12 @@ def generate_answer(
     )
 
     # --------------------------------------------------------
-    # Create prompt
+    # Build prompt
     # --------------------------------------------------------
 
-    prompt = PROMPT.invoke(
-        {
-            "context": context,
-            "question": question,
-        }
+    formatted_prompt = PROMPT.format(
+        context=context,
+        question=question,
     )
 
     # --------------------------------------------------------
@@ -286,12 +330,8 @@ def generate_answer(
     llm = get_llm()
 
     response = llm.invoke(
-        prompt
+        formatted_prompt
     )
-
-    # --------------------------------------------------------
-    # Safely return response
-    # --------------------------------------------------------
 
     if isinstance(
         response.content,
